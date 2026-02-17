@@ -1,0 +1,8 @@
+__pycache__
+/libemg
+/pickles/*
+/data_sgt/*
+/data_sgt_PROCESSED/*
+/spaceship/*
+/spaceship_PROCESSES/*
+/figures/*
