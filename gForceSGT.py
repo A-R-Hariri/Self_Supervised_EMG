@@ -9,6 +9,12 @@ from libemg._datasets.dataset import Dataset
 from libemg.data_handler import OfflineDataHandler
 
 
+REP_FORMS = {
+    'steadystate': 0,
+    'limbpositions': 1,
+    }
+
+
 # ======== UTILS  ========
 
 def natural_sort_key(s):
@@ -20,7 +26,7 @@ def natural_sort_key(s):
 
 def process_user(subject_path, out_path, subject_id):
     # Allowed sub-directories
-    target_folders = ['limbpositions', 'steadystate']
+    target_folders = ['steadystate', 'limbpositions']
     
     # Regex to parse C (Class/Gesture) and R (Repetition)
     # Pattern: C_0_R_0_emg.csv
@@ -71,6 +77,7 @@ def process_user(subject_path, out_path, subject_id):
                     rep_grp.create_dataset("subject", data=subject_id)
                     rep_grp.create_dataset("rep", data=rep_id)
                     rep_grp.create_dataset("gesture", data=gesture_id)
+                    rep_grp.create_dataset("rep_form", data=REP_FORMS[folder])
 
                 except Exception as e:
                     print(f"Error processing {f_name}: {e}")
@@ -130,7 +137,9 @@ class gForceSGT(Dataset):
         odh.subjects = []
         odh.classes = []
         odh.reps = []
-        odh.extra_attributes = ["subjects", "classes", "reps"]
+        odh.rep_forms = []
+        odh.extra_attributes = ["subjects", "classes", 
+                                "reps", "rep_forms"]
 
         # Load all h5 files in directory
         files = sorted([f for f in os.listdir(processed_root) if f.endswith('.h5')], key=natural_sort_key)
@@ -151,6 +160,7 @@ class gForceSGT(Dataset):
 
                     gst = int(group["gesture"][()])
                     rep_id = int(group["rep"][()])
+                    rep_form = int(group["rep_form"][()])
                     emg = group["emg"][:] # (Samples, 8)
 
                     if emg.shape[0] == 0:
@@ -163,6 +173,7 @@ class gForceSGT(Dataset):
                     odh.classes.append(np.ones((len(emg), 1), dtype=np.int64) * gst)
                     odh.subjects.append(np.ones((len(emg), 1), dtype=np.int64) * subject)
                     odh.reps.append(np.ones((len(emg), 1), dtype=np.int64) * rep_id)
+                    odh.rep_forms.append(np.ones((len(emg), 1), dtype=np.int64) * rep_form)
 
         return odh
 
