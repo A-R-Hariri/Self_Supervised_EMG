@@ -2,7 +2,7 @@ import os
 import h5py
 import numpy as np
 import pandas as pd
-import re
+import re, json
 from os.path import join
 
 from libemg._datasets.dataset import Dataset
@@ -12,6 +12,7 @@ from libemg.data_handler import OfflineDataHandler
 REP_FORMS = {
     'steadystate': 0,
     'limbpositions': 1,
+    'transitions': 2,
     }
 
 
@@ -24,68 +25,85 @@ def natural_sort_key(s):
 
 # ======== PREPROCESSING  ========
 
-def process_user(subject_path, out_path, subject_id):
+def process_user(subject_path, out_path, subject_id, trans_delay):
     # Allowed sub-directories
-    target_folders = ['steadystate', 'limbpositions']
+    target_folders = ['steadystate', 
+                      'limbpositions',
+                      'transitions']
     
     # Regex to parse C (Class/Gesture) and R (Repetition)
     # Pattern: C_0_R_0_emg.csv
-    filename_pattern = re.compile(r"C_(\d+)_R_(\d+)_emg\.csv")
+
 
     unique_counter = 0
 
     with h5py.File(out_path, "w") as h5:
         for folder in target_folders:
+
             folder_path = join(subject_path, folder)
-            
             if not os.path.exists(folder_path):
                 continue
-
             files = [f for f in os.listdir(folder_path) if f.endswith(".csv")]
             files.sort(key=natural_sort_key)
 
             for f_name in files:
+
+                filename_pattern = re.compile(r"C_(\d+)_R_(\d+)_emg\.csv")
+                if folder == 'transitions':
+                    filename_pattern = re.compile(r"C_(\d+)_R_(\d+)_O_(\d+)_emg\.csv")
+                    with open(join(subject_path, folder, 'collection_details.json')) as _f:
+                        order = json.load(_f)
+
                 match = filename_pattern.search(f_name)
                 if not match:
                     continue
 
                 gesture_id = int(match.group(1))
                 rep_id = int(match.group(2))
+                if folder == 'transitions':
+                    order_id = int(match.group(3))
 
                 # Read CSV: 8 columns, no header
-                try:
-                    full_file_path = join(folder_path, f_name)
-                    data = pd.read_csv(full_file_path, header=None, delimiter=',')
-                    
-                    # Ensure strictly 8 columns
+                full_file_path = join(folder_path, f_name)
+                data = pd.read_csv(full_file_path, header=None, delimiter=',')
+                
+                # Ensure strictly 8 columns
+                if data.shape[1] != 8:
+                    # Fallback for potential whitespace delimiters if standard csv fails
+                    data = pd.read_csv(full_file_path, header=None, delim_whitespace=True)
                     if data.shape[1] != 8:
-                        # Fallback for potential whitespace delimiters if standard csv fails
-                        data = pd.read_csv(full_file_path, header=None, delim_whitespace=True)
-                        if data.shape[1] != 8:
-                            print(f"Skipping {f_name}: Invalid column count {data.shape[1]}")
-                            continue
+                        print(f"Skipping {f_name}: Invalid column count {data.shape[1]}")
+                        continue
 
-                    emg_matrix = data.values.astype(np.float32)
+                emg_matrix = data.values.astype(np.float32)
+                if trans_delay is not None and folder == 'transitions':
+                    emg_delay, emg_matrix = emg_matrix[:trans_delay], emg_matrix[trans_delay:]
+                    from_gesture_id = int(order['collection_order'][order_id]['from_class'])
 
-                    # Create unique HDF5 group (cannot use rep_id as key due to duplicates across folders)
                     grp_name = f"segment_{unique_counter}"
                     unique_counter += 1
-                    
                     rep_grp = h5.create_group(grp_name)
-
-                    rep_grp.create_dataset("emg", data=emg_matrix)
+                    rep_grp.create_dataset("emg", data=emg_delay)
                     rep_grp.create_dataset("subject", data=subject_id)
                     rep_grp.create_dataset("rep", data=rep_id)
-                    rep_grp.create_dataset("gesture", data=gesture_id)
+                    rep_grp.create_dataset("gesture", data=from_gesture_id)
                     rep_grp.create_dataset("rep_form", data=REP_FORMS[folder])
 
-                except Exception as e:
-                    print(f"Error processing {f_name}: {e}")
+                # Create unique HDF5 group (cannot use rep_id as key due to duplicates across folders)
+                grp_name = f"segment_{unique_counter}"
+                unique_counter += 1
+                rep_grp = h5.create_group(grp_name)
+
+                rep_grp.create_dataset("emg", data=emg_matrix)
+                rep_grp.create_dataset("subject", data=subject_id)
+                rep_grp.create_dataset("rep", data=rep_id)
+                rep_grp.create_dataset("gesture", data=gesture_id)
+                rep_grp.create_dataset("rep_form", data=REP_FORMS[folder])
 
     print(f"Subject {subject_id} processed. Output: {out_path}")
 
 
-def process_dataset(root_in, root_out):
+def process_dataset(root_in, root_out, trans_delay=None):
     os.makedirs(root_out, exist_ok=True)
     
     # Structure defined as data_sgt/Day 1/S#
@@ -111,7 +129,8 @@ def process_dataset(root_in, root_out):
         process_user(
             subject_path=in_path,
             out_path=out_path,
-            subject_id=subject_id)
+            subject_id=subject_id,
+            trans_delay=trans_delay)
 
 
 # ======== DATASET CLASS ========
@@ -177,11 +196,12 @@ class gForceSGT(Dataset):
 
         return odh
 
-    def prepare_data(self, channel_last=True, subjects=None):
+    def prepare_data(self, channel_last=True, 
+                     trans_delay=None, subjects=None):
         processed_dir = self.dataset_folder + "_PROCESSED"
 
         if not os.path.exists(processed_dir):
             print(f"Processing dataset from {self.dataset_folder} to {processed_dir}...")
-            process_dataset(self.dataset_folder, processed_dir)
+            process_dataset(self.dataset_folder, processed_dir, trans_delay)
 
         return self._get_odh(processed_dir, subjects, channel_last)
