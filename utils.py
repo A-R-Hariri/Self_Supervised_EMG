@@ -1,6 +1,7 @@
 import numpy as np, pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, balanced_accuracy_score
+from typing import Any
 
 import torch; import torch.nn as nn
 import torch.nn.functional as F
@@ -20,22 +21,24 @@ if is_notebook():
 else:
     from tqdm import tqdm
 
+from libemg.feature_extractor import FeatureExtractor
 from Losses.VICReg import vicreg_loss, augment
 
 
 # ======== CONFIG ========
 PATH = "pickles"
 DTYPE = np.float32
-SEQ = 100; INC = 5; CH = 8; CLASSES = 5; VAL_CUTOFF = 55
-WORKERS = 4; PRE_FETCH = 2; VERBOSE=True; DEVICE = 'cuda'
-UPDATE_EVERY = 50; PRESIST_WORKER = True; PIN_MEMORY = True
+SEQ = 200; SSL_INC = 40; INC = 5; CH = 8; CLASSES = 5
+VAL_CUTOFF = 55; WORKERS = 4; PRE_FETCH = 2; VERBOSE=True
+UPDATE_EVERY = 1; PRESIST_WORKER = True; PIN_MEMORY = True
+DEVICE = 'cuda'
 
 FT_CLASSES = [0, 1, 2, 3, 4]
 
-SSL_EPOCHS = 200; SSL_LR = 5e-5; LR_PATIENCE_SSL = 4
-FT_EPOCHS = 200; LR_INIT = 1e-3; LR_MIN = 5e-6
-LR_FACTOR = 0.8; LR_PATIENCE = 4
-DROPOUT = 0.2; BATCH_SIZE = 4096; PATIENCE = 10
+SSL_EPOCHS = 20; SSL_LR = 5e-5; LR_PATIENCE_SSL = 4
+FT_EPOCHS = 100; LR_INIT = 1e-3; LR_MIN = 5e-6
+LR_FACTOR = 0.8; LR_PATIENCE = 4; DROPOUT = 0.2 
+SSL_BATCH_SIZE = 4096; BATCH_SIZE = 128; PATIENCE = 10
 
 
 # ======== UTILS ========
@@ -50,6 +53,23 @@ def filter_by_classes(x: np.ndarray, y: np.ndarray,
                       keep_classes: list[int]):
     keep = np.isin(y, np.array(keep_classes, dtype=y.dtype))
     return x[keep], y[keep]
+
+def _check(name, t):
+    if not torch.is_tensor(t): return
+    if torch.isnan(t).any() or torch.isinf(t).any():
+        raise RuntimeError(f"NaN/Inf in {name}: "
+                           f"nan={torch.isnan(t).any().item()} "
+                           f"inf={torch.isinf(t).any().item()} "
+                           f"min={t.nan_to_num().min().item()} "
+                           f"max={t.nan_to_num().max().item()}")
+
+
+# ======== UTILS ========
+def extract_features(x, feature_list, feature_dic=None):
+    feature_extractor = FeatureExtractor()
+    features = feature_extractor.extract_features(feature_list, x, array=True,
+                                fix_feature_errors=False, feature_dic=feature_dic)
+    return torch.from_numpy(features.astype(DTYPE))
 
 
 # ======== LOADERS ========
@@ -85,44 +105,13 @@ def create_ssl_loader(x, batch=BATCH_SIZE, shuffle=False,
     drop_last=False)
 
 
-# ======== EVAL (SUPERVISED) ========
-@torch.no_grad()
-def evaluate_sup(model, loader, loss_fn, device):
-    model.eval()
-    model.to(device)
-    lsum = torch.tensor(0.0, device=device)
-    cor = torch.tensor(0.0, device=device)
-    tot = 0
-    y_true_list, y_pred_list = [], []
-
-    for xb, yb in loader:
-        xb = xb.to(device, non_blocking=True)
-        yb = yb.to(device, non_blocking=True)
-        with torch.amp.autocast(device_type="cuda", 
-                                enabled=(device == "cuda")):
-            logits = model(xb)
-            loss = loss_fn(logits, yb)
-        preds = logits.argmax(1)
-        lsum += loss
-        cor += (preds == yb).sum()
-        tot += yb.numel()
-        y_true_list.append(yb)
-        y_pred_list.append(preds)
-
-    y_true = torch.cat(y_true_list).cpu().numpy()
-    y_pred = torch.cat(y_pred_list).cpu().numpy()
-    f1 = f1_score(y_true, y_pred, average="macro")
-    bal_acc = balanced_accuracy_score(y_true, y_pred)
-    avg_acc = cor.item() / max(1, tot)
-    avg_loss = lsum.item() / max(1, len(loader))
-    return avg_acc, avg_loss, f1, bal_acc
-
-
 # ======== TRAIN (VICREG SSL) ========
 def pretrain_vicreg(
     model: nn.Module,
     ssl_loader: DataLoader,
     name: str,
+    feature_list: list=None,
+    feature_dict: dict=None,
     epochs: int = SSL_EPOCHS,
     lr: float = SSL_LR,
     min_lr: float = LR_MIN,
@@ -130,6 +119,7 @@ def pretrain_vicreg(
     lr_patience: int = LR_PATIENCE_SSL,
     verbose=VERBOSE,
     device: str = DEVICE):
+
     model.to(device)
     opt = Adam(model.parameters(), lr=lr)
     sch = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -148,6 +138,12 @@ def pretrain_vicreg(
             xb = xb.to(device, non_blocking=True)
             x1 = augment(xb)
             x2 = augment(xb)
+
+            if feature_list is not None:
+                x1 = extract_features(x1.detach().cpu(), feature_list, feature_dict)
+                x2 = extract_features(x2.detach().cpu(), feature_list, feature_dict)
+                x1 = x1.to(device, non_blocking=True)
+                x2 = x2.to(device, non_blocking=True)
 
             opt.zero_grad(set_to_none=True)
             with autocast(device_type="cuda", 
@@ -185,7 +181,7 @@ def train_supervised(
     train_loader: DataLoader,
     val_loader: DataLoader,
     name: str,
-    loss_fn,
+    loss_fn: Any,
     epochs: int = FT_EPOCHS,
     lr: float = LR_INIT,
     min_lr: float = LR_MIN,
@@ -194,6 +190,7 @@ def train_supervised(
     patience: int = PATIENCE,
     verbose=VERBOSE,
     device: str = DEVICE):
+
     model.to(device)
     opt = Adam([p for p in model.parameters() if p.requires_grad], lr=lr)
     sch = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -269,3 +266,36 @@ def train_supervised(
     if best_state is not None:
         model.load_state_dict(best_state)
     return model
+
+
+# ======== EVAL (SUPERVISED) ========
+@torch.no_grad()
+def evaluate_sup(model, loader, loss_fn, device):
+    model.eval()
+    model.to(device)
+    lsum = torch.tensor(0.0, device=device)
+    cor = torch.tensor(0.0, device=device)
+    tot = 0
+    y_true_list, y_pred_list = [], []
+
+    for xb, yb in loader:
+        xb = xb.to(device, non_blocking=True)
+        yb = yb.to(device, non_blocking=True)
+        with torch.amp.autocast(device_type="cuda", 
+                                enabled=(device == "cuda")):
+            logits = model(xb)
+            loss = loss_fn(logits, yb)
+        preds = logits.argmax(1)
+        lsum += loss
+        cor += (preds == yb).sum()
+        tot += yb.numel()
+        y_true_list.append(yb)
+        y_pred_list.append(preds)
+
+    y_true = torch.cat(y_true_list).cpu().numpy()
+    y_pred = torch.cat(y_pred_list).cpu().numpy()
+    f1 = f1_score(y_true, y_pred, average="macro")
+    bal_acc = balanced_accuracy_score(y_true, y_pred)
+    avg_acc = cor.item() / max(1, tot)
+    avg_loss = lsum.item() / max(1, len(loader))
+    return avg_acc, avg_loss, f1, bal_acc
