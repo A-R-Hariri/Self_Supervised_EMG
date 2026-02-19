@@ -5,7 +5,7 @@ import torch.nn.functional as F
 # ======== AUGMENTATION (GPU, B,C,L) ========
 def augment(x: torch.Tensor) -> torch.Tensor:
     B, C, L = x.shape
-    y = x.clone()
+    y = x.clone().detach()
 
     # ---- (1) global amplitude scaling (per sample) ----
     mask = torch.rand(B, device=x.device) < 0.25
