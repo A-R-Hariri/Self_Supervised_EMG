@@ -3,6 +3,11 @@ __pycache__
 /pickles/*
 /data_sgt/*
 /data_sgt_PROCESSED/*
+/data0_sgt/*
+/data0_sgt_PROCESSED/*
+/data1_sgt/*
+/data1_sgt_PROCESSED/*
 /spaceship/*
-/spaceship_PROCESSES/*
+/spaceship_PROCESSED/*
 /figures/*
+*.zip

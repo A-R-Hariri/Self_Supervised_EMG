@@ -9,22 +9,15 @@ from utils import *
 class CNN(nn.Module):
     def __init__(self, ch=CH, seq=SEQ, emb_dim=128, proj_dim=128, dropout=DROPOUT):
         super().__init__()
-        self.conv1 = nn.Conv1d(ch, 32, 8, padding="same")
-        self.conv2 = nn.Conv1d(32, 64, 6, padding="same")
-        self.conv3 = nn.Conv1d(64, 128, 4, padding="same")
+        self.conv1 = nn.Conv1d(ch, 32, 16, padding="same")
+        self.conv2 = nn.Conv1d(32, 64, 12, padding="same")
+        self.conv3 = nn.Conv1d(64, 128, 8, padding="same")
         self.bn1 = nn.BatchNorm1d(32)
         self.bn2 = nn.BatchNorm1d(64)
         self.bn3 = nn.BatchNorm1d(128)
 
         # self.pool = nn.MaxPool1d(2)
         self.pool = nn.AdaptiveAvgPool1d(1)
-
-        with torch.no_grad():
-            dummy = torch.zeros(1, ch, seq)
-            x = self.pool(F.relu(self.conv1(dummy)))
-            x = self.pool(F.relu(self.conv2(x)))
-            x = F.relu(self.conv3(x))
-            fc_in = x.flatten(1).shape[1]
 
         self.fc1 = nn.Linear(128, 128)
         self.fc_emb = nn.Linear(128, emb_dim)  # embedding
