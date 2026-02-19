@@ -16,8 +16,8 @@ class CNN(nn.Module):
         self.bn2 = nn.BatchNorm1d(64)
         self.bn3 = nn.BatchNorm1d(128)
 
-        self.pool = nn.MaxPool1d(2)
-        # self.pool = nn.AdaptiveAvgPool1d(1)
+        # self.pool = nn.MaxPool1d(2)
+        self.pool = nn.AdaptiveAvgPool1d(1)
 
         with torch.no_grad():
             dummy = torch.zeros(1, ch, seq)
@@ -26,14 +26,16 @@ class CNN(nn.Module):
             x = F.relu(self.conv3(x))
             fc_in = x.flatten(1).shape[1]
 
-        self.fc1 = nn.Linear(SEQ * 128, 256)
-        self.fc_emb = nn.Linear(256, emb_dim)  # embedding
+        self.fc1 = nn.Linear(128, 128)
+        self.fc_emb = nn.Linear(128, emb_dim)  # embedding
         self.drop = nn.Dropout(dropout)
+        self.relu = nn.ReLU()
+        self.gelu = nn.GELU()
 
         # projector for SSL
         self.proj = nn.Sequential(
             nn.Linear(emb_dim, emb_dim),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.Linear(emb_dim, proj_dim))
 
         # classifier head (set later for fine-tune)
@@ -51,9 +53,9 @@ class CNN(nn.Module):
     def set_classifier(self, num_classes: int):
         self.classifier = nn.Sequential(
                         nn.Linear(self.fc_emb.out_features, 
-                                self.fc_emb.out_features // 2),
+                                self.fc_emb.out_features),
                         nn.ReLU(),
-                        nn.Linear(self.fc_emb.out_features // 2, num_classes))
+                        nn.Linear(self.fc_emb.out_features, num_classes))
     
     def set_linear_probe(self, num_classes: int):
         self.classifier = nn.Linear(self.fc_emb.out_features, num_classes)
@@ -63,26 +65,26 @@ class CNN(nn.Module):
 
         x = self.conv1(x)
         x = self.bn1(x)
-        x = F.relu(x)
+        x = self.relu(x)
         x = self.drop(x)
         # x = self.pool(x)
 
         x = self.conv2(x)
         x = self.bn2(x)
-        x = F.relu(x)
+        x = self.relu(x)
         x = self.drop(x)
         # x = self.pool(x)
 
         x = self.conv3(x)
         x = self.bn3(x)
-        x = F.relu(x)
+        x = self.relu(x)
         x = self.drop(x)
         # x = self.pool(x)
 
-        # x = self.pool(x).squeeze(-1)
-        x = x.flatten(1)
+        x = self.pool(x).squeeze(-1)
+        # x = x.flatten(1)
 
-        x = F.gelu(self.fc1(x))
+        x = self.gelu(self.fc1(x))
         x = self.drop(x)
         emb = self.fc_emb(x)
 
