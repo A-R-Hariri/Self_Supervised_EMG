@@ -76,7 +76,7 @@ for SEED in [13]:
         _data = sgt_data.isolate_data("subjects", list(range(s + 1)), fast=True)
 
         train_data = _data.isolate_data("rep_forms", [0], fast=True)
-        train_data = _data.isolate_data("reps", [1], fast=True)
+        train_data = _data.isolate_data("reps", [0], fast=True)
         X, y = train_data.parse_windows(SEQ, INC)
 
         val_data = _data.isolate_data("rep_forms", [0], fast=True)
