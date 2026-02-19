@@ -1,7 +1,7 @@
 import warnings, sys, os, gc
 from os.path import join
 warnings.filterwarnings("ignore")
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import torch; print(torch.cuda.is_available())
 
@@ -53,9 +53,10 @@ _empty = [{
 df = pd.DataFrame(_empty)
 # ---- save full per-seed results ----
 out_csv = f"within_cnn.csv"
-df.to_csv(out_csv, index=False)
+df.to_csv(out_csv, mode='a', index=False,
+          header=not os.path.exists(out_csv))
 
-for SEED in [13]:
+for SEED in [7, 13, 42, 67, 69]:
     random.seed(SEED); np.random.seed(SEED)
     GENERATOR = torch.manual_seed(SEED)
 
@@ -73,7 +74,7 @@ for SEED in [13]:
     for s in range(SUBJECTS):
         # ======== SUPERVISED ========
         # ---- FT Data ---
-        _data = sgt_data.isolate_data("subjects", list(range(s + 1)), fast=True)
+        _data = sgt_data.isolate_data("subjects", [s], fast=True)
 
         train_data = _data.isolate_data("rep_forms", [0], fast=True)
         train_data = _data.isolate_data("reps", [0], fast=True)
