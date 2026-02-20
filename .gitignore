@@ -11,3 +11,4 @@ __pycache__
 /spaceship_PROCESSED/*
 /figures/*
 *.zip
+*.csv

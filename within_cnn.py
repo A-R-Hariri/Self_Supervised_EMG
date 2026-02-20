@@ -27,7 +27,7 @@ path = join(PATH, 'ssl')
 ssl_windows = np.load(join(path, 'ssl_windows.npy'), mmap_mode=MMAP_MODE)
 
 path = join(PATH, 'sgt')
-sgt_data = np.load(join(path, 'sgt_data0.npy'), allow_pickle=True).item()
+sgt_data = np.load(join(path, 'sgt_data1.npy'), allow_pickle=True).item()
 
 
 # ======== PIPELINE ========
