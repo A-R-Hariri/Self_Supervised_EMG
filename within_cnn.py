@@ -99,9 +99,9 @@ for SEED in [13, 42]:
                                             batch=BATCH_SIZE, shuffle=True)
         ft_test_loader_static = create_sup_loader(X_t_static, y_t_static["classes"], 
                                             batch=BATCH_SIZE, shuffle=True)
-        ft_test_loader_limb = create_sup_loader(X_t_static, y_t_static["classes"], 
+        ft_test_loader_limb = create_sup_loader(X_t_limb, y_t_limb["classes"], 
                                             batch=BATCH_SIZE, shuffle=True)
-        ft_test_loader_trans = create_sup_loader(X_t_static, y_t_static["classes"], 
+        ft_test_loader_trans = create_sup_loader(X_t_trans, y_t_trans["classes"], 
                                             batch=BATCH_SIZE, shuffle=True)
 
         # ---- class weights for FT ----
@@ -137,6 +137,10 @@ for SEED in [13, 42]:
         for p in model_2.conv1.parameters(): p.requires_grad = False
         for p in model_2.conv2.parameters(): p.requires_grad = False
         for p in model_2.conv3.parameters(): p.requires_grad = False
+        for p in model_2.bn1.parameters(): p.requires_grad = False
+        for p in model_2.bn2.parameters(): p.requires_grad = False
+        for p in model_2.bn3.parameters(): p.requires_grad = False
+        for p in model_2.pool.parameters(): p.requires_grad = False
         model_2 = train_supervised(
             model_2, ft_train_loader, ft_val_loader,
             name=f"cnn_pretrained_frozen_cnn_then_ft_seed{SEED}",
