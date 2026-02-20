@@ -1,9 +1,10 @@
 import warnings, sys, os, gc
 from os.path import join
 warnings.filterwarnings("ignore")
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1] if len(sys.argv) > 1 else "0"
 
 import torch; print(torch.cuda.is_available())
+import torch.nn as nn
 
 import libemg
 from libemg.datasets import get_dataset_list
@@ -19,7 +20,9 @@ from Models.MLP import MLP
 
 
 MMAP_MODE = 'r'
-SUBJECTS = 5
+DAY = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+SUBJECTS = 5 if DAY else 6
+
 SAMPLING_RATE = 1000
 FEATURE_LIST = ['WENG']
 FEATURE_DIC = {'WENG_fs': SAMPLING_RATE}
@@ -34,7 +37,7 @@ sample_features = extract_features(ssl_windows[:10],
 n_features = sample_features.shape[1]
 
 path = join(PATH, 'sgt')
-sgt_data = np.load(join(path, 'sgt_data1.npy'), allow_pickle=True).item()
+sgt_data = np.load(join(path, f'sgt_data{DAY}.npy'), allow_pickle=True).item()
 
 
 # ======== PIPELINE ========
@@ -58,13 +61,11 @@ _empty = [{
         "exp5_acc_t": ''}]
 df = pd.DataFrame(_empty)
 # ---- save full per-seed results ----
-out_csv = f"within_mlp_d1.csv"
-df.to_csv(out_csv, index=False)
+out_csv = f"within_mlp_d{DAY}.csv"
+df.to_csv(out_csv)
 
 for SEED in [7, 13, 42, 67, 127]:
-    random.seed(SEED); np.random.seed(SEED)
-    GENERATOR = torch.manual_seed(SEED)
-
+    seed_everything(SEED)
 
     # ======== SSL ========
     # ---- SSL Data ----
@@ -74,7 +75,7 @@ for SEED in [7, 13, 42, 67, 127]:
     # ---- BASE: Pretraining ----
     pretrained = MLP(n_features, emb_dim=128, proj_dim=128, dropout=DROPOUT)
     pretrained = pretrain_vicreg(pretrained, ssl_loader, 
-                                 name=f"cnn_vicreg_ssl_seed{SEED}",
+                                 name=f"mlp_vicreg_ssl_seed{SEED}",
                                  feature_list=FEATURE_LIST,
                                  feature_dict=FEATURE_DIC)
     
@@ -134,7 +135,7 @@ for SEED in [7, 13, 42, 67, 127]:
             p.requires_grad = True
         model_1 = train_supervised(
             model_1, ft_train_loader, ft_val_loader,
-            name=f"cnn_pretrained_then_ft_seed{SEED}",
+            name=f"mlp_pretrained_then_ft_seed{SEED}",
             loss_fn=ft_loss)
         acc_1_s, _, f1_1_s, bal_1_s = evaluate_sup(model_1, ft_test_loader_static, ft_loss, DEVICE)
         acc_1_l, _, f1_1_l, bal_1_l = evaluate_sup(model_1, ft_test_loader_limb, ft_loss, DEVICE)
@@ -152,8 +153,8 @@ for SEED in [7, 13, 42, 67, 127]:
         for p in model_2.fc3.parameters(): p.requires_grad = False
         model_2 = train_supervised(
             model_2, ft_train_loader, ft_val_loader,
-            name=f"cnn_pretrained_frozen_cnn_then_ft_seed{SEED}",
-            loss_fn=ft_loss)
+            name=f"mlp_pretrained_frozen_mlp_then_ft_seed{SEED}",
+            loss_fn=ft_loss, disable_bn=True)
         acc_2_s, _, f1_2_s, bal_2_s = evaluate_sup(model_2, ft_test_loader_static, ft_loss, DEVICE)
         acc_2_l, _, f1_2_l, bal_2_l = evaluate_sup(model_2, ft_test_loader_limb, ft_loss, DEVICE)
         acc_2_t, _, f1_2_t, bal_2_t = evaluate_sup(model_2, ft_test_loader_trans, ft_loss, DEVICE)
@@ -169,8 +170,8 @@ for SEED in [7, 13, 42, 67, 127]:
             p.requires_grad = True
         model_3 = train_supervised(
             model_3, ft_train_loader, ft_val_loader,
-            name=f"cnn_linear_probe_seed{SEED}",
-            loss_fn=ft_loss)
+            name=f"mlp_linear_probe_seed{SEED}",
+            loss_fn=ft_loss, disable_bn=True)
         acc_3_s, _, f1_3_s, bal_3_s = evaluate_sup(model_3, ft_test_loader_static, ft_loss, DEVICE)
         acc_3_l, _, f1_3_l, bal_3_l = evaluate_sup(model_3, ft_test_loader_limb, ft_loss, DEVICE)
         acc_3_t, _, f1_3_t, bal_3_t = evaluate_sup(model_3, ft_test_loader_trans, ft_loss, DEVICE)
@@ -186,8 +187,8 @@ for SEED in [7, 13, 42, 67, 127]:
             p.requires_grad = True
         model_4 = train_supervised(
             model_4, ft_train_loader, ft_val_loader,
-            name=f"cnn_linear_probe_ssl5_seed{SEED}",
-            loss_fn=ft_loss)
+            name=f"mlp_linear_probe_ssl5_seed{SEED}",
+            loss_fn=ft_loss, disable_bn=True)
 
         acc_4_s, _, f1_4_s, bal_4_s = evaluate_sup(model_4, ft_test_loader_static, ft_loss, DEVICE)
         acc_4_l, _, f1_4_l, bal_4_l = evaluate_sup(model_4, ft_test_loader_limb, ft_loss, DEVICE)
@@ -201,12 +202,15 @@ for SEED in [7, 13, 42, 67, 127]:
             p.requires_grad = True
         model_5 = train_supervised(
             model_5, ft_train_loader, ft_val_loader,
-            name=f"cnn_raw_ft_only_seed{SEED}",
+            name=f"mlp_raw_ft_only_seed{SEED}",
             loss_fn=ft_loss)
         acc_5_s, _, f1_5_s, bal_5_s = evaluate_sup(model_5, ft_test_loader_static, ft_loss, DEVICE)
         acc_5_l, _, f1_5_l, bal_5_l = evaluate_sup(model_5, ft_test_loader_limb, ft_loss, DEVICE)
         acc_5_t, _, f1_5_t, bal_5_t = evaluate_sup(model_5, ft_test_loader_trans, ft_loss, DEVICE)
 
+        del model_1, model_2, model_3, model_4, model_5
+        torch.cuda.empty_cache()
+        gc.collect()
 
         # ======== LOGGING ========
         result = [{

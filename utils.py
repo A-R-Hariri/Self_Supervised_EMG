@@ -1,7 +1,9 @@
+import os
 import numpy as np, pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, balanced_accuracy_score
 from typing import Any
+import random
 
 import torch; import torch.nn as nn
 import torch.nn.functional as F
@@ -30,18 +32,37 @@ PATH = "pickles"
 DTYPE = np.float32
 SEQ = 200; SSL_INC = 40; INC = 5; CH = 8; CLASSES = 5
 VAL_CUTOFF = 55; WORKERS = 4; PRE_FETCH = 2; VERBOSE=True
-UPDATE_EVERY = 1; PRESIST_WORKER = True; PIN_MEMORY = True
+UPDATE_EVERY = 1; PRESIST_WORKER = False; PIN_MEMORY = True
 DEVICE = 'cuda'
 
 FT_CLASSES = [0, 1, 2, 3, 4]
 
-SSL_EPOCHS = 20; SSL_LR = 5e-5; LR_PATIENCE_SSL = 4
-FT_EPOCHS = 100; LR_INIT = 1e-3; LR_MIN = 5e-6
-LR_FACTOR = 0.8; LR_PATIENCE = 4; DROPOUT = 0.2 
+SSL_EPOCHS = 50; SSL_LR = 1e-4; LR_PATIENCE_SSL = 4
+FT_EPOCHS = 100; LR_INIT = 1e-4; LR_MIN = 5e-6
+LR_FACTOR = 0.8; LR_PATIENCE = 2; DROPOUT = 0.2 
 SSL_BATCH_SIZE = 4096; BATCH_SIZE = 128; PATIENCE = 10
 
 
 # ======== UTILS ========
+def seed_everything(seed: int, deterministic: bool = True):
+    random.seed(seed)
+    np.random.seed(seed)
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  
+
+    if deterministic:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+        # for matmul/cublas determinism on some ops
+        # os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+        # torch.use_deterministic_algorithms(True)
+    else:
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = False
+        torch.use_deterministic_algorithms(False)
+
 def count_params(m):
     return sum(p.numel() for p in m.parameters() if p.requires_grad)
 
@@ -77,7 +98,8 @@ def extract_features(x, feature_list, feature_dic=None, np_array=False):
 # ======== LOADERS ========
 def create_sup_loader(x, y, batch=BATCH_SIZE, shuffle=False, 
                   workers=WORKERS, prefetch_factor=PRE_FETCH,
-                  persistent_workers=PRESIST_WORKER):
+                  persistent_workers=PRESIST_WORKER,
+                  pin_memory=PIN_MEMORY):
     return DataLoader(
     TensorDataset(torch.from_numpy(x), 
                   torch.from_numpy(y)),
@@ -88,13 +110,14 @@ def create_sup_loader(x, y, batch=BATCH_SIZE, shuffle=False,
     num_workers=workers,
     prefetch_factor=prefetch_factor if workers > 0 else None,
     persistent_workers=persistent_workers,
-    pin_memory=PIN_MEMORY,
+    pin_memory=pin_memory,
     drop_last=False)
 
 
 def create_ssl_loader(x, batch=BATCH_SIZE, shuffle=False, 
                   workers=WORKERS, prefetch_factor=PRE_FETCH,
-                  persistent_workers=PRESIST_WORKER):
+                  persistent_workers=PRESIST_WORKER,
+                  pin_memory=PIN_MEMORY):
     return DataLoader(
     TensorDataset(torch.from_numpy(x)),
                 #   torch.tensor(x)), 
@@ -103,7 +126,7 @@ def create_ssl_loader(x, batch=BATCH_SIZE, shuffle=False,
     num_workers=workers,
     prefetch_factor=prefetch_factor if workers > 0 else None,
     persistent_workers=persistent_workers,
-    pin_memory=PIN_MEMORY,
+    pin_memory=pin_memory,
     drop_last=False)
 
 
@@ -119,6 +142,7 @@ def pretrain_vicreg(
     min_lr: float = LR_MIN,
     lr_factor: float = LR_FACTOR,
     lr_patience: int = LR_PATIENCE_SSL,
+    disable_bn: bool=False,
     verbose=VERBOSE,
     device: str = DEVICE):
 
@@ -130,6 +154,10 @@ def pretrain_vicreg(
 
     for ep in range(1, epochs + 1):
         model.train()
+        if disable_bn:
+            for m in model.modules():
+                if isinstance(m, nn.BatchNorm1d):
+                    m.eval()
         total_loss = torch.tensor(0.0, device=device)
         total = 0
         step = 0
@@ -192,6 +220,7 @@ def train_supervised(
     lr_factor: float = LR_FACTOR,
     lr_patience: int = LR_PATIENCE,
     patience: int = PATIENCE,
+    disable_bn: bool=False,
     verbose=VERBOSE,
     device: str = DEVICE):
 
@@ -208,6 +237,11 @@ def train_supervised(
 
     for ep in range(1, epochs + 1):
         model.train()
+        if disable_bn:
+            for m in model.modules():
+                if isinstance(m, nn.BatchNorm1d):
+                    m.eval()
+                    
         total_loss = torch.tensor(0.0, device=device)
         correct = torch.tensor(0.0, device=device)
         total = 0
