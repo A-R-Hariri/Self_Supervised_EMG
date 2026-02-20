@@ -65,10 +65,12 @@ def _check(name, t):
 
 
 # ======== UTILS ========
-def extract_features(x, feature_list, feature_dic=None):
+def extract_features(x, feature_list, feature_dic=None, np_array=False):
     feature_extractor = FeatureExtractor()
     features = feature_extractor.extract_features(feature_list, x, array=True,
                                 fix_feature_errors=False, feature_dic=feature_dic)
+    if np_array:
+        return features.astype(DTYPE)
     return torch.from_numpy(features.astype(DTYPE))
 
 
@@ -142,6 +144,8 @@ def pretrain_vicreg(
             if feature_list is not None:
                 x1 = extract_features(x1.detach().cpu(), feature_list, feature_dict)
                 x2 = extract_features(x2.detach().cpu(), feature_list, feature_dict)
+                x1 /= 10_000.0
+                x2 /= 10_000.0
                 x1 = x1.to(device, non_blocking=True)
                 x2 = x2.to(device, non_blocking=True)
 
