@@ -1,7 +1,7 @@
 import warnings, sys, os, gc
 from os.path import join
 warnings.filterwarnings("ignore")
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 import torch; print(torch.cuda.is_available())
 
@@ -19,7 +19,7 @@ from Models.MLP import MLP
 
 
 MMAP_MODE = 'r'
-SUBJECTS = 5
+SUBJECTS = 6
 SAMPLING_RATE = 1000
 FEATURE_LIST = ['WENG']
 FEATURE_DIC = {'WENG_fs': SAMPLING_RATE}
@@ -34,7 +34,7 @@ sample_features = extract_features(ssl_windows[:10],
 n_features = sample_features.shape[1]
 
 path = join(PATH, 'sgt')
-sgt_data = np.load(join(path, 'sgt_data1.npy'), allow_pickle=True).item()
+sgt_data = np.load(join(path, 'sgt_data0.npy'), allow_pickle=True).item()
 
 
 # ======== PIPELINE ========
@@ -58,7 +58,7 @@ _empty = [{
         "exp5_acc_t": ''}]
 df = pd.DataFrame(_empty)
 # ---- save full per-seed results ----
-out_csv = f"within_mlp_d1.csv"
+out_csv = f"within_mlp_d0.csv"
 df.to_csv(out_csv, mode='a', index=False)
 
 for SEED in [7, 13, 42, 67, 127]:

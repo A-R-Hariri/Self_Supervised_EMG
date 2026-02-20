@@ -1,7 +1,7 @@
 import warnings, sys, os, gc
 from os.path import join
 warnings.filterwarnings("ignore")
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import torch; print(torch.cuda.is_available())
 
@@ -19,7 +19,7 @@ from Models.CNN import CNN
 
 
 MMAP_MODE = 'r'
-SUBJECTS = 5
+SUBJECTS = 6
 
 
 # ======== LOAD ========
@@ -27,7 +27,7 @@ path = join(PATH, 'ssl')
 ssl_windows = np.load(join(path, 'ssl_windows.npy'), mmap_mode=MMAP_MODE)
 
 path = join(PATH, 'sgt')
-sgt_data = np.load(join(path, 'sgt_data1.npy'), allow_pickle=True).item()
+sgt_data = np.load(join(path, 'sgt_data0.npy'), allow_pickle=True).item()
 
 
 # ======== PIPELINE ========
@@ -51,10 +51,10 @@ _empty = [{
         "exp5_acc_t": ''}]
 df = pd.DataFrame(_empty)
 # ---- save full per-seed results ----
-out_csv = f"within_cnn_d1.csv"
+out_csv = f"within_cnn_d0.csv"
 df.to_csv(out_csv, mode='a', index=False)
 
-for SEED in [13]:
+for SEED in [7, 13, 42, 67, 127]:
     random.seed(SEED); np.random.seed(SEED)
     GENERATOR = torch.manual_seed(SEED)
 
