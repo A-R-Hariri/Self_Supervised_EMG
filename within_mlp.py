@@ -1,7 +1,7 @@
 import warnings, sys, os, gc
 from os.path import join
 warnings.filterwarnings("ignore")
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import torch; print(torch.cuda.is_available())
 
@@ -19,7 +19,7 @@ from Models.MLP import MLP
 
 
 MMAP_MODE = 'r'
-SUBJECTS = 6
+SUBJECTS = 5
 SAMPLING_RATE = 1000
 FEATURE_LIST = ['WENG']
 FEATURE_DIC = {'WENG_fs': SAMPLING_RATE}
@@ -28,13 +28,13 @@ FEATURE_DIC = {'WENG_fs': SAMPLING_RATE}
 # ======== LOAD ========
 path = join(PATH, 'ssl')
 ssl_windows = np.load(join(path, 'ssl_windows.npy'), mmap_mode=MMAP_MODE)
-sample_features = extract_features(ssl_windows, 
+sample_features = extract_features(ssl_windows[:10], 
                                    feature_list=FEATURE_LIST, 
                                    feature_dic=FEATURE_DIC)
 n_features = sample_features.shape[1]
 
 path = join(PATH, 'sgt')
-sgt_data = np.load(join(path, 'sgt_data0.npy'), allow_pickle=True).item()
+sgt_data = np.load(join(path, 'sgt_data1.npy'), allow_pickle=True).item()
 
 
 # ======== PIPELINE ========
@@ -58,9 +58,8 @@ _empty = [{
         "exp5_acc_t": ''}]
 df = pd.DataFrame(_empty)
 # ---- save full per-seed results ----
-out_csv = f"within_mlp_d0.csv"
-df.to_csv(out_csv, mode='a', index=False,
-          header=not os.path.exists(out_csv))
+out_csv = f"within_mlp_d1.csv"
+df.to_csv(out_csv, mode='a', index=False)
 
 for SEED in [7, 13, 42, 67, 127]:
     random.seed(SEED); np.random.seed(SEED)
@@ -85,17 +84,17 @@ for SEED in [7, 13, 42, 67, 127]:
         _data = sgt_data.isolate_data("subjects", [s], fast=True)
 
         train_data = _data.isolate_data("rep_forms", [0], fast=True)
-        train_data = _data.isolate_data("reps", [0], fast=True)
+        train_data = train_data.isolate_data("reps", [0], fast=True)
         X, y = train_data.parse_windows(SEQ, INC)
         X = extract_features(X, FEATURE_LIST, FEATURE_DIC, True)
 
         val_data = _data.isolate_data("rep_forms", [0], fast=True)
-        val_data = _data.isolate_data("reps", [1], fast=True)
+        val_data = val_data.isolate_data("reps", [1], fast=True)
         X_v, y_v = val_data.parse_windows(SEQ, INC)
         X_v = extract_features(X_v, FEATURE_LIST, FEATURE_DIC, True)
 
         test_data = _data.isolate_data("rep_forms", [0], fast=True)
-        val_data = _data.isolate_data("reps", [2, 3, 4], fast=True)
+        test_data = test_data.isolate_data("reps", [2, 3, 4], fast=True)
         X_t_static, y_t_static = test_data.parse_windows(SEQ, INC)
         X_t_static = extract_features(X_t_static, FEATURE_LIST, FEATURE_DIC, True)
 
@@ -110,13 +109,13 @@ for SEED in [7, 13, 42, 67, 127]:
         ft_train_loader = create_sup_loader(X, y["classes"], 
                                             batch=BATCH_SIZE, shuffle=True)
         ft_val_loader = create_sup_loader(X_v, y_v["classes"], 
-                                            batch=BATCH_SIZE, shuffle=True)
+                                            batch=BATCH_SIZE, shuffle=False)
         ft_test_loader_static = create_sup_loader(X_t_static, y_t_static["classes"], 
-                                            batch=BATCH_SIZE, shuffle=True)
+                                            batch=BATCH_SIZE, shuffle=False)
         ft_test_loader_limb = create_sup_loader(X_t_limb, y_t_limb["classes"], 
-                                            batch=BATCH_SIZE, shuffle=True)
+                                            batch=BATCH_SIZE, shuffle=False)
         ft_test_loader_trans = create_sup_loader(X_t_trans, y_t_trans["classes"], 
-                                            batch=BATCH_SIZE, shuffle=True)
+                                            batch=BATCH_SIZE, shuffle=False)
 
         # ---- class weights for FT ----
         ft_weights = compute_class_weight(class_weight="balanced", 
@@ -149,7 +148,7 @@ for SEED in [7, 13, 42, 67, 127]:
         for p in model_2.parameters():
             p.requires_grad = True
         for p in model_2.fc1.parameters(): p.requires_grad = False
-        for p in model_2.fc1.parameters(): p.requires_grad = False
+        for p in model_2.fc2.parameters(): p.requires_grad = False
         for p in model_2.fc3.parameters(): p.requires_grad = False
         model_2 = train_supervised(
             model_2, ft_train_loader, ft_val_loader,
@@ -214,24 +213,24 @@ for SEED in [7, 13, 42, 67, 127]:
             "seed": SEED,
             "subject": s,
             # ---- EXP 1 ----
-            "exp1_acc_s": acc_1_l,
-            "exp1_acc_l": acc_1_s,
+            "exp1_acc_s": acc_1_s,
+            "exp1_acc_l": acc_1_l,
             "exp1_acc_t": acc_1_t,
             # ---- EXP 2 ----
-            "exp2_acc_s": acc_2_l,
-            "exp2_acc_l": acc_2_s,
+            "exp2_acc_s": acc_2_s,
+            "exp2_acc_l": acc_2_l,
             "exp2_acc_t": acc_2_t,
             # ---- EXP 3 ----
-            "exp3_acc_s": acc_3_l,
-            "exp3_acc_l": acc_3_s,
+            "exp3_acc_s": acc_3_s,
+            "exp3_acc_l": acc_3_l,
             "exp3_acc_t": acc_3_t,
             # ---- EXP 4 ----
-            "exp4_acc_s": acc_4_l,
-            "exp4_acc_l": acc_4_s,
+            "exp4_acc_s": acc_4_s,
+            "exp4_acc_l": acc_4_l,
             "exp4_acc_t": acc_4_t,
             # ---- EXP 5 ----
-            "exp5_acc_s": acc_5_l,
-            "exp5_acc_l": acc_5_s,
+            "exp5_acc_s": acc_5_s,
+            "exp5_acc_l": acc_5_l,
             "exp5_acc_t": acc_5_t,
         }]
         df_new = pd.DataFrame(result)

@@ -52,10 +52,9 @@ _empty = [{
 df = pd.DataFrame(_empty)
 # ---- save full per-seed results ----
 out_csv = f"within_cnn_d1.csv"
-df.to_csv(out_csv, mode='a', index=False,
-          header=not os.path.exists(out_csv))
+df.to_csv(out_csv, mode='a', index=False)
 
-for SEED in [13, 42]:
+for SEED in [13]:
     random.seed(SEED); np.random.seed(SEED)
     GENERATOR = torch.manual_seed(SEED)
 
@@ -76,15 +75,15 @@ for SEED in [13, 42]:
         _data = sgt_data.isolate_data("subjects", [s], fast=True)
 
         train_data = _data.isolate_data("rep_forms", [0], fast=True)
-        train_data = _data.isolate_data("reps", [0], fast=True)
+        train_data = train_data.isolate_data("reps", [0], fast=True)
         X, y = train_data.parse_windows(SEQ, INC)
 
         val_data = _data.isolate_data("rep_forms", [0], fast=True)
-        val_data = _data.isolate_data("reps", [1], fast=True)
+        val_data = val_data.isolate_data("reps", [1], fast=True)
         X_v, y_v = val_data.parse_windows(SEQ, INC)
 
         test_data = _data.isolate_data("rep_forms", [0], fast=True)
-        val_data = _data.isolate_data("reps", [2, 3, 4], fast=True)
+        test_data = test_data.isolate_data("reps", [2, 3, 4], fast=True)
         X_t_static, y_t_static = test_data.parse_windows(SEQ, INC)
 
         test_data = _data.isolate_data("rep_forms", [1], fast=True)
@@ -96,13 +95,13 @@ for SEED in [13, 42]:
         ft_train_loader = create_sup_loader(X, y["classes"], 
                                             batch=BATCH_SIZE, shuffle=True)
         ft_val_loader = create_sup_loader(X_v, y_v["classes"], 
-                                            batch=BATCH_SIZE, shuffle=True)
+                                            batch=BATCH_SIZE, shuffle=False)
         ft_test_loader_static = create_sup_loader(X_t_static, y_t_static["classes"], 
-                                            batch=BATCH_SIZE, shuffle=True)
+                                            batch=BATCH_SIZE, shuffle=False)
         ft_test_loader_limb = create_sup_loader(X_t_limb, y_t_limb["classes"], 
-                                            batch=BATCH_SIZE, shuffle=True)
+                                            batch=BATCH_SIZE, shuffle=False)
         ft_test_loader_trans = create_sup_loader(X_t_trans, y_t_trans["classes"], 
-                                            batch=BATCH_SIZE, shuffle=True)
+                                            batch=BATCH_SIZE, shuffle=False)
 
         # ---- class weights for FT ----
         ft_weights = compute_class_weight(class_weight="balanced", 
@@ -140,7 +139,6 @@ for SEED in [13, 42]:
         for p in model_2.bn1.parameters(): p.requires_grad = False
         for p in model_2.bn2.parameters(): p.requires_grad = False
         for p in model_2.bn3.parameters(): p.requires_grad = False
-        for p in model_2.pool.parameters(): p.requires_grad = False
         model_2 = train_supervised(
             model_2, ft_train_loader, ft_val_loader,
             name=f"cnn_pretrained_frozen_cnn_then_ft_seed{SEED}",
@@ -204,24 +202,24 @@ for SEED in [13, 42]:
             "seed": SEED,
             "subject": s,
             # ---- EXP 1 ----
-            "exp1_acc_s": acc_1_l,
-            "exp1_acc_l": acc_1_s,
+            "exp1_acc_s": acc_1_s,
+            "exp1_acc_l": acc_1_l,
             "exp1_acc_t": acc_1_t,
             # ---- EXP 2 ----
-            "exp2_acc_s": acc_2_l,
-            "exp2_acc_l": acc_2_s,
+            "exp2_acc_s": acc_2_s,
+            "exp2_acc_l": acc_2_l,
             "exp2_acc_t": acc_2_t,
             # ---- EXP 3 ----
-            "exp3_acc_s": acc_3_l,
-            "exp3_acc_l": acc_3_s,
+            "exp3_acc_s": acc_3_s,
+            "exp3_acc_l": acc_3_l,
             "exp3_acc_t": acc_3_t,
             # ---- EXP 4 ----
-            "exp4_acc_s": acc_4_l,
-            "exp4_acc_l": acc_4_s,
+            "exp4_acc_s": acc_4_s,
+            "exp4_acc_l": acc_4_l,
             "exp4_acc_t": acc_4_t,
             # ---- EXP 5 ----
-            "exp5_acc_s": acc_5_l,
-            "exp5_acc_l": acc_5_s,
+            "exp5_acc_s": acc_5_s,
+            "exp5_acc_l": acc_5_l,
             "exp5_acc_t": acc_5_t,
         }]
         df_new = pd.DataFrame(result)
