@@ -18,6 +18,7 @@ class CNN(nn.Module):
 
         # self.pool = nn.MaxPool1d(2)
         self.pool = nn.AdaptiveAvgPool1d(1)
+        self.norm = nn.LayerNorm(emb_dim)
 
         self.fc1 = nn.Linear(128, 128)
         self.fc_emb = nn.Linear(128, emb_dim)  # embedding
@@ -54,7 +55,7 @@ class CNN(nn.Module):
         self.classifier = nn.Linear(self.fc_emb.out_features, num_classes)
 
     def forward(self, x, return_emb=False, return_proj=False):
-        x *= 500.0
+        x *= 1000.0
 
         x = self.conv1(x)
         x = self.bn1(x)
@@ -80,6 +81,7 @@ class CNN(nn.Module):
         x = self.gelu(self.fc1(x))
         x = self.drop(x)
         emb = self.fc_emb(x)
+        emb = self.norm(emb)
 
         if return_proj:
             return self.proj(emb)

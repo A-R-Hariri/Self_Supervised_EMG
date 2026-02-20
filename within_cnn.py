@@ -1,7 +1,7 @@
 import warnings, sys, os, gc
 from os.path import join
 warnings.filterwarnings("ignore")
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 import torch; print(torch.cuda.is_available())
 
@@ -52,7 +52,7 @@ _empty = [{
 df = pd.DataFrame(_empty)
 # ---- save full per-seed results ----
 out_csv = f"within_cnn_d0.csv"
-df.to_csv(out_csv, mode='a', index=False)
+df.to_csv(out_csv, index=False)
 
 for SEED in [7, 13, 42, 67, 127]:
     random.seed(SEED); np.random.seed(SEED)

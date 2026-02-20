@@ -144,8 +144,8 @@ def pretrain_vicreg(
             if feature_list is not None:
                 x1 = extract_features(x1.detach().cpu(), feature_list, feature_dict)
                 x2 = extract_features(x2.detach().cpu(), feature_list, feature_dict)
-                x1 /= 10_000.0
-                x2 /= 10_000.0
+                # x1 /= 10_000.0
+                # x2 /= 10_000.0
                 x1 = x1.to(device, non_blocking=True)
                 x2 = x2.to(device, non_blocking=True)
 

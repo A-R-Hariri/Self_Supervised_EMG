@@ -17,6 +17,7 @@ class MLP(nn.Module):
         self.drop = nn.Dropout(dropout)
         self.relu = nn.ReLU()
         # self.gelu = nn.GELU()
+        self.norm = nn.LayerNorm(emb_dim)
 
         # projector for SSL
         self.proj = nn.Sequential(
@@ -46,9 +47,7 @@ class MLP(nn.Module):
     def set_linear_probe(self, num_classes: int):
         self.classifier = nn.Linear(self.fc_emb.out_features, num_classes)
 
-    def forward(self, x, return_emb=False, return_proj=False):
-        x *= 500.0
-        
+    def forward(self, x, return_emb=False, return_proj=False):        
         x = self.relu(self.fc1(x))
         x = self.drop(x)
 
@@ -59,6 +58,7 @@ class MLP(nn.Module):
         x = self.drop(x)
 
         emb = self.fc_emb(x)
+        emb = self.norm(emb)
 
         if return_proj:
             return self.proj(emb)
