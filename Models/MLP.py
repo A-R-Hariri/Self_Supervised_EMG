@@ -47,8 +47,8 @@ class MLP(nn.Module):
         self.classifier = nn.Linear(self.fc_emb.out_features, num_classes)
 
     def forward(self, x, return_emb=False, return_proj=False):
-        x /= 10.0
-
+        x *= 500.0
+        
         x = self.relu(self.fc1(x))
         x = self.drop(x)
 
