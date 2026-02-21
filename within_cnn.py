@@ -212,3 +212,5 @@ for SEED in [7, 13, 42, 67, 127]:
         mode = 'a'
 
     del pretrained
+    torch.cuda.empty_cache()
+    gc.collect()
