@@ -32,28 +32,9 @@ sgt_data = np.load(join(path, f'sgt_data{DAY}.npy'), allow_pickle=True).item()
 
 
 # ======== PIPELINE ========
-_empty = [{
-        "seed": '',
-        "subject": '',
-        "exp1_acc_s": '',
-        "exp1_acc_l": '',
-        "exp1_acc_t": '',
-        "exp2_acc_s": '',
-        "exp2_acc_l": '',
-        "exp2_acc_t": '',
-        "exp3_acc_s": '',
-        "exp3_acc_l": '',
-        "exp3_acc_t": '',
-        "exp4_acc_s": '',
-        "exp4_acc_l": '',
-        "exp4_acc_t": '',
-        "exp5_acc_s": '',
-        "exp5_acc_l": '',
-        "exp5_acc_t": ''}]
-df = pd.DataFrame(_empty)
-# ---- save full per-seed results ----
 out_csv = f"within_cnn_d{DAY}.csv"
-df.to_csv(out_csv)
+mode = 'w'
+write_header = True
 
 for SEED in [7, 13, 42, 67, 127]:
     seed_everything(SEED)
@@ -196,39 +177,36 @@ for SEED in [7, 13, 42, 67, 127]:
         acc_5_l, _, f1_5_l, bal_5_l = evaluate_sup(model_5, ft_test_loader_limb, ft_loss, DEVICE)
         acc_5_t, _, f1_5_t, bal_5_t = evaluate_sup(model_5, ft_test_loader_trans, ft_loss, DEVICE)
 
-        del model_1, model_2, model_3, model_4, model_5
+        del pretrained, model_1, model_2, model_3, model_4, model_5
+        del ssl_loader
+        del ft_train_loader
+        del ft_val_loader
+        del ft_test_loader_static
+        del ft_test_loader_limb
+        del ft_test_loader_trans
         torch.cuda.empty_cache()
         gc.collect()
 
-        # ======== LOGGING ========
-        result = [{
-            "seed": SEED,
-            "subject": s,
-            # ---- EXP 1 ----
-            "exp1_acc_s": acc_1_s,
-            "exp1_acc_l": acc_1_l,
-            "exp1_acc_t": acc_1_t,
-            # ---- EXP 2 ----
-            "exp2_acc_s": acc_2_s,
-            "exp2_acc_l": acc_2_l,
-            "exp2_acc_t": acc_2_t,
-            # ---- EXP 3 ----
-            "exp3_acc_s": acc_3_s,
-            "exp3_acc_l": acc_3_l,
-            "exp3_acc_t": acc_3_t,
-            # ---- EXP 4 ----
-            "exp4_acc_s": acc_4_s,
-            "exp4_acc_l": acc_4_l,
-            "exp4_acc_t": acc_4_t,
-            # ---- EXP 5 ----
-            "exp5_acc_s": acc_5_s,
-            "exp5_acc_l": acc_5_l,
-            "exp5_acc_t": acc_5_t,
-        }]
-        df_new = pd.DataFrame(result)
-        df_new.to_csv(out_csv, mode='a', index=False,
-        header=not os.path.exists(out_csv))
-
-        df_new = pd.DataFrame(_empty)
-        df_new.to_csv(out_csv, mode='a', index=False, 
-              header=not os.path.exists(out_csv))
+        rows = []
+        for exp_name, acc_s, acc_l, acc_t in [
+            ("exp1", acc_1_s, acc_1_l, acc_1_t),
+            ("exp2", acc_2_s, acc_2_l, acc_2_t),
+            ("exp3", acc_3_s, acc_3_l, acc_3_t),
+            ("exp4", acc_4_s, acc_4_l, acc_4_t),
+            ("exp5", acc_5_s, acc_5_l, acc_5_t),
+        ]:
+            rows.extend([
+                {"seed": SEED, "subject": s, "experiment": exp_name,
+                "test_type": "static", "accuracy": acc_s},
+                {"seed": SEED, "subject": s, "experiment": exp_name,
+                "test_type": "limb", "accuracy": acc_l},
+                {"seed": SEED, "subject": s, "experiment": exp_name,
+                "test_type": "trans", "accuracy": acc_t},
+            ])
+        pd.DataFrame(rows).to_csv(
+            out_csv,
+            mode=mode,
+            index=False,
+            header=write_header)
+        write_header = False
+        mode = 'a'
