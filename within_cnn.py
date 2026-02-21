@@ -177,7 +177,7 @@ for SEED in [7, 13, 42, 67, 127]:
         acc_5_l, _, f1_5_l, bal_5_l = evaluate_sup(model_5, ft_test_loader_limb, ft_loss, DEVICE)
         acc_5_t, _, f1_5_t, bal_5_t = evaluate_sup(model_5, ft_test_loader_trans, ft_loss, DEVICE)
 
-        del pretrained, model_1, model_2, model_3, model_4, model_5
+        del model_1, model_2, model_3, model_4, model_5
         del ssl_loader
         del ft_train_loader
         del ft_val_loader
@@ -210,3 +210,5 @@ for SEED in [7, 13, 42, 67, 127]:
             header=write_header)
         write_header = False
         mode = 'a'
+
+    del pretrained
