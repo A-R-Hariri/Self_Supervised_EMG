@@ -16,6 +16,10 @@ class CNN(nn.Module):
         self.bn2 = nn.BatchNorm1d(64)
         self.bn3 = nn.BatchNorm1d(128)
 
+        self.skip1 = nn.Conv1d(ch, 32, 1)
+        self.skip2 = nn.Conv1d(32, 64, 1)
+        self.skip3 = nn.Conv1d(64, 128, 1)
+
         # self.pool = nn.MaxPool1d(2)
         self.pool = nn.AdaptiveAvgPool1d(1)
         self.norm = nn.LayerNorm(emb_dim)
@@ -55,32 +59,42 @@ class CNN(nn.Module):
         self.classifier = nn.Linear(self.fc_emb.out_features, num_classes)
 
     def forward(self, x, return_emb=False, return_proj=False):
-        x *= 1000.0
+        x *= 500.0
 
+        # ---- Conv1 + residual ----
+        identity = self.skip1(x)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.drop(x)
-        # x = self.pool(x)
+        x = x + identity
 
+        # ---- Conv2 + residual ----
+        identity = self.skip2(x)
         x = self.conv2(x)
         x = self.bn2(x)
         x = self.relu(x)
         x = self.drop(x)
-        # x = self.pool(x)
+        x = x + identity
 
+        # ---- Conv3 + residual ----
+        identity = self.skip3(x)
         x = self.conv3(x)
         x = self.bn3(x)
         x = self.relu(x)
         x = self.drop(x)
-        # x = self.pool(x)
+        x = x + identity
 
         x = self.pool(x).squeeze(-1)
         # x = x.flatten(1)
 
+        # ---- Residual MLP ----
+        identity = x
         x = self.gelu(self.fc1(x))
         x = self.drop(x)
+
         emb = self.fc_emb(x)
+        emb = emb + identity
         emb = self.norm(emb)
 
         if return_proj:

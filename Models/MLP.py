@@ -9,9 +9,9 @@ class MLP(nn.Module):
     def __init__(self, feats, emb_dim=128, proj_dim=128, dropout=DROPOUT):
         super().__init__()
 
-        self.fc1 = nn.Linear(feats, 256)
-        self.fc2 = nn.Linear(256, 256)
-        self.fc3 = nn.Linear(256, 128)
+        self.fc1 = nn.Linear(feats, 128)
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, 128)
         self.fc_emb = nn.Linear(128, emb_dim)  # embedding
         
         self.drop = nn.Dropout(dropout)

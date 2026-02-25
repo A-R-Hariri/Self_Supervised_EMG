@@ -1,4 +1,4 @@
-__pycache__
+*__pycache__
 /libemg
 /pickles/*
 /data_sgt/*
@@ -12,4 +12,4 @@ __pycache__
 /figures/*
 *.zip
 *.csv
-archive
+archivegit add .g   
