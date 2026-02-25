@@ -190,7 +190,6 @@ for SEED in [7, 13, 42, 67, 127]:
         acc_5_t, _, f1_5_t, bal_5_t = evaluate_sup(model_5, ft_test_loader_trans, ft_loss, DEVICE)
 
         del model_1, model_2, model_3, model_4, model_5
-        del ssl_loader
         del ft_train_loader
         del ft_val_loader
         del ft_test_loader_static
@@ -224,6 +223,6 @@ for SEED in [7, 13, 42, 67, 127]:
         write_header = False
         mode = 'a'
 
-    del pretrained
+    del pretrained, ssl_loader
     torch.cuda.empty_cache()
     gc.collect()
