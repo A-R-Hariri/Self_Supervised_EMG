@@ -20,7 +20,7 @@ from Models.CNN import CNN
 
 MMAP_MODE = 'r'
 DAY = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-SUBJECTS = 5 if DAY else 6
+SUBJECTS = 6
 
 
 # ======== LOAD ========
