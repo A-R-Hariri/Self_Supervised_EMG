@@ -1,6 +1,6 @@
 # Self-Supervised EMG
 
-Side project exploring self-supervised pre-training (VICReg) for zero-shot cross-user EMG gesture classification on the [EMG-EPN-612](https://github.com/Loshchilov-Hutter/EMG_EPN612) dataset.
+Exploring self-supervised pre-training (VICReg) for zero-shot cross-user EMG gesture classification on the **EMG-EPN-612** dataset.
 
 ## Dataset
 
@@ -8,7 +8,7 @@ Side project exploring self-supervised pre-training (VICReg) for zero-shot cross
 
 Fixed split: users 1–306 training, 307–332 validation, 333–612 testing (280 test users). The split is global and never randomized.
 
-A secondary real-world dataset (`SPACESHIP`, 16 subjects) is included as a LibEMG-compatible dataset class for unlabeled continuous streaming use cases.
+A secondary real-world dataset (`SPACESHIP`, 16 subjects) is included as a LibEMG-compatible dataset class for unlabeled continuous EMg data using OyMotion sensor. Data collected during an EMG-controlled spaceship game, without labels.
 
 ## Approach
 
